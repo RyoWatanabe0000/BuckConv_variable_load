@@ -6,6 +6,7 @@ from os import path
 import sympy as sp
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from decimal import Decimal
 
 
 class BuckConverterEnv(gym.Env):
@@ -374,7 +375,7 @@ class BuckConverterEnv(gym.Env):
             # 負荷変動にかかる時間を計算
             self.load_transition_time = abs(load_value - self.R_ini) / self.resistance_change_rate
             # 負荷変動に要するstep数を計算
-            self.load_transition_num_step = np.ceil(self.load_transition_time / self.dt_cont)
+            self.load_transition_num_step = int(np.ceil(self.load_transition_time / self.dt_cont))
             # 負荷変動が増加か減少かで傾きの符号を変える
             if self.R_now > load_value:
                 self.resistance_change_rate = -1 * abs(self.resistance_change_rate)
@@ -572,7 +573,10 @@ class BuckConverterEnv(gym.Env):
 
         # ステップの途中で負荷変動が終わる場合
         else:
-            remaining_time = self.load_transition_time - self.load_transition_num_elapsed_step * self.dt_cont
+            # 引き算で丸め誤差が出るため10進数で計算
+            d1 = Decimal(f"{self.load_transition_time}")
+            d2 = Decimal(f"{self.load_transition_num_elapsed_step * self.dt_cont}")
+            remaining_time = float(d1 - d2)
             assert 0 < remaining_time <= self.dt_cont
 
             t_eval_list_all = np.hstack((t_eval_list_all, [remaining_time, time_turn_on, time_turn_off]))
