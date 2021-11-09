@@ -11,7 +11,7 @@ import datetime
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
-from buck_converter_env import BuckConverterEnv
+from buck_converter_env_gradual_load_change_with_scipy import BuckConverterEnv
 
 # 図用の初期設定
 plt.rcParams['font.family'] ='sans-serif'   #使用するフォント
@@ -30,12 +30,12 @@ TIME_contorl = 1/FREQ_control   #制御周期
 
 # 素子値
 E = 100
-L = 0.35e-3
-R = 10
+L = 0.50e-3
+R = 25
 C = 220e-6
 
-N_LOOP = 100
-N_EPISODE = 3000
+N_LOOP = 2
+N_EPISODE = 100
 MAX_EPI_LEN = int(TIME_LIMIT / TIME_contorl)
 GAMMA = 0.99
 N_HIDDON_CHANNEL = 64
@@ -46,7 +46,7 @@ TARGET_INTERVAL = 1000
 UPDATE_INTERVAL = 1
 MINIBATCH_SIZE = 32
 LEARNING_RATE = 3e-4
-SAVE_DIR = f'agents64_3e-4_2%_withoutlog_reward_or'
+SAVE_DIR = f'agents64_3e-4_gauss_with_steadyflag_new'
 START_FLAG = True
 break_flag = False
 
@@ -215,8 +215,8 @@ def main():
     def eval_model():
         total_reward = 0
         with agent.eval_mode():
-            for i in range(5):
-                vcc = 20 + i * 10
+            for i in range(1):
+                vcc = 25 + i * 10
                 obs = env_for_test.reset(v_out_command=vcc)
                 R = 0
                 t = 0
@@ -233,25 +233,28 @@ def main():
         return total_reward
 
     # 学習開始
+    print("start", end='')
     R_list = []
     for episode in range(1, N_EPISODE + 1):
 
         v_out_ref = np.random.uniform(low=20, high=60)
-        # load_change_index = int(np.random.uniform(low=100, high=125))
+        v_out_ref = 25
+        load_change_index = int(np.random.uniform(low=100, high=125))
         # while True:
         #     second_load_value = np.random.uniform(low=5.0, high=15.0)
         #     # 負荷が重くなった場合に定常状態で必要な電流が8Aを超えないように負荷の値を選択する
         #     if v_out_ref / 8 < second_load_value:
         #         break
+        second_load_value = 5
 
         # obs = env.reset(il_ini=v_out_ref/10, v_out_ini=v_out_ref, v_out_command=v_out_ref)
-        obs = env.reset(v_out_command=v_out_ref)
+        obs = env.reset(v_out_command=v_out_ref, resistance_change_rate=25000)
         R = 0
         step = 0
 
         while True:
-            # if step == load_change_index:
-            #     env.set_load_value(second_load_value)
+            if step == load_change_index:
+                env.set_load_value(second_load_value)
 
             action = agent.act(obs)
 
@@ -300,13 +303,13 @@ def main():
     agent.load(f"{SAVE_PATH}/best_model")
 
     with agent.eval_mode():
-        obs = env_for_test.reset(v_out_command=25)
+        obs = env_for_test.reset(v_out_command=25, resistance_change_rate=25000)
         R = 0
         t = 0
         action_list = []
         while True:
-            # if t == int(MAX_EPI_LEN / 2):
-            #     env_for_test.set_load_value(5)
+            if t == int(MAX_EPI_LEN / 2):
+                env_for_test.set_load_value(5)
 
             action = agent.act(obs)
             obs, r, done, _ = env_for_test.step(action)

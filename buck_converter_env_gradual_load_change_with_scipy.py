@@ -41,6 +41,7 @@ class BuckConverterEnv(gym.Env):
         self.load_value_list = [self.R_ini]
         self.rtol = 1e-6   # scipy用設定　相対許容誤差
         self.atol = 1e-8   # scipy用設定　絶対許容誤差
+        self.steady_state_flag = int(False)   # 定常状態判定用フラグ
 
         # 行動空間の定義
         # high = np.array([1], dtype=np.float32)
@@ -55,8 +56,9 @@ class BuckConverterEnv(gym.Env):
                          np.finfo(np.float32).max,
                          np.finfo(np.float32).max,
                          np.finfo(np.float32).max,
-                         np.finfo(np.float32).max,
-                         np.finfo(np.float32).max],
+                         1],
+                         # np.finfo(np.float32).max,
+                         # np.finfo(np.float32).max],
                         dtype=np.float32)
         self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
 
@@ -168,7 +170,7 @@ class BuckConverterEnv(gym.Env):
         self.observation_list.append(obs)
         self.load_value_list.append(self.R_now)     # 現在の負荷の値を記録
 
-        return self.__get_observation_for_test(), self.__get_reward(), False, {}
+        return self.__get_observation3(), self.__get_reward3(), False, {}
 
     def reset(self, il_ini=0.0, v_out_ini=0.0, v_out_command=25, resistance_change_rate=25000):
 
@@ -192,7 +194,9 @@ class BuckConverterEnv(gym.Env):
         self.load_transition_num_step = 0
         self.load_change_steps_remaining = 0
 
-        return self.__get_observation_for_test()
+        self.steady_state_flag = int(False)
+
+        return self.__get_observation3()
 
     def render(self, mode='human'):
 
@@ -254,7 +258,7 @@ class BuckConverterEnv(gym.Env):
         return observation
 
     # 3ステップの負荷電圧とインダクタ電流を状態値に含む
-    def __get_observation(self):
+    def __get_observation1(self):
         observation = np.ravel(np.zeros((1, 7), dtype=np.float32))
         observation[0: 6] = np.concatenate([self.observation_list[self.time_index],
                                             self.observation_list[self.time_index + 1],
@@ -272,6 +276,19 @@ class BuckConverterEnv(gym.Env):
         observation[0: 3] = iR_liston3step
         observation[3] = self.observation_list[self.time_index + 2][0]  # 現在のインダクタ電流を代入
         observation[4] = self.v_out_command  # 電流の指令値を代入
+        return observation
+
+    # 3ステップの負荷電圧と現在のインダクタ電流と定常状態フラグを状態値に含む
+    def __get_observation3(self):
+        observation = np.ravel(np.zeros((1, 6), dtype=np.float32))
+        # 3ステップ分の負荷電流のリスト
+        iR_liston3step = [self.observation_list[self.time_index][1],
+                          self.observation_list[self.time_index + 1][1],
+                          self.observation_list[self.time_index + 2][1]]
+        observation[0: 3] = iR_liston3step
+        observation[3] = self.observation_list[self.time_index + 2][0]  # 現在のインダクタ電流を代入
+        observation[4] = self.v_out_command  # 電流の指令値を代入
+        observation[5] = self.steady_state_flag
         return observation
 
     def __get_reward(self):
@@ -353,6 +370,57 @@ class BuckConverterEnv(gym.Env):
         if prepre_iL > lim12 and pre_iL > lim12 and current_iL > lim12:
             reward -= 5.0
         elif prepre_iL > lim10 and pre_iL > lim10 and current_iL > lim10:
+            reward -= 1.0
+
+        return reward
+
+    def __get_reward3(self):
+
+        reward = 0
+        error_limit_ratio = 0.02
+        upper_limit2 = self.v_out_command * (1 + error_limit_ratio)
+        under_limit2 = self.v_out_command * (1 - error_limit_ratio)
+
+        prepre_iL, prepre_v_out = self.observation_list[self.time_index]
+        pre_iL, pre_v_out = self.observation_list[self.time_index + 1]
+        current_iL, current_v_out = self.observation_list[self.time_index + 2]
+
+        if pre_v_out <= under_limit2 and current_v_out <= under_limit2:
+            if current_v_out > pre_v_out:
+                reward += 0.01
+
+        if under_limit2 < prepre_v_out < upper_limit2 and \
+                under_limit2 < pre_v_out < upper_limit2 and \
+                under_limit2 < current_v_out < upper_limit2:
+            reward += 1.0
+
+            # 定常状態フラグをオンにする
+            self.steady_state_flag = int(True)
+
+            # 誤差の小ささに応じて追加報酬を与える
+            prepre_error = 100 * abs(prepre_v_out - self.v_out_command) / self.v_out_command
+            pre_error = 100 * abs(prepre_v_out - self.v_out_command) / self.v_out_command
+            current_error = 100 * abs(prepre_v_out - self.v_out_command) / self.v_out_command
+
+            prepre_score = -0.1 * prepre_error + 0.2
+            pre_score = -0.1 * pre_error + 0.2
+            current_score = -0.1 * current_error + 0.2
+
+            reward += (1/3) * (prepre_score + pre_score + current_score)
+
+        else:
+            reward -= 0.05
+
+        if pre_v_out >= upper_limit2 and current_v_out >= upper_limit2:
+            if current_v_out < pre_v_out:
+                reward += 0.01
+
+        lim14 = 12 / self.normalize_ampere
+        lim13 = 13 / self.normalize_ampere
+
+        if current_iL > lim14:
+            reward -= 5.0
+        elif current_iL > lim13:
             reward -= 1.0
 
         return reward
