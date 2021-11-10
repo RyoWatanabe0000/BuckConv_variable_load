@@ -34,11 +34,11 @@ L = 0.50e-3
 R = 25
 C = 220e-6
 
-N_LOOP = 2
-N_EPISODE = 100
+N_LOOP = 100
+N_EPISODE = 3000
 MAX_EPI_LEN = int(TIME_LIMIT / TIME_contorl)
 GAMMA = 0.99
-N_HIDDON_CHANNEL = 64
+N_HIDDON_CHANNEL = 100
 N_HIDDON_LAYER = 2
 BUFFER_SIZE = 10**5
 REPLAY_START_SIZE = 5000
@@ -49,6 +49,7 @@ LEARNING_RATE = 3e-4
 SAVE_DIR = f'agents64_3e-4_gauss_with_steadyflag_new'
 START_FLAG = True
 break_flag = False
+RESISTANCE_CHANGE_RATE = 25000
 
 env = BuckConverterEnv(dt=TIME_contorl, E_ini=E, R_ini=R, L_ini=L, C_ini=C, career_amp=1, smooth_scale=1)
 env_for_test = BuckConverterEnv(dt=TIME_contorl, E_ini=E, R_ini=R, L_ini=L, C_ini=C, career_amp=1, smooth_scale=50)
@@ -217,10 +218,12 @@ def main():
         with agent.eval_mode():
             for i in range(1):
                 vcc = 25 + i * 10
-                obs = env_for_test.reset(v_out_command=vcc)
+                obs = env_for_test.reset(v_out_command=vcc, resistance_change_rate=RESISTANCE_CHANGE_RATE)
                 R = 0
                 t = 0
                 while True:
+                    if t == int(MAX_EPI_LEN / 2):
+                        env_for_test.set_load_value(5)
                     action = agent.act(obs)
                     obs, r, done, _ = env_for_test.step(action)
                     R += r
@@ -248,7 +251,7 @@ def main():
         second_load_value = 5
 
         # obs = env.reset(il_ini=v_out_ref/10, v_out_ini=v_out_ref, v_out_command=v_out_ref)
-        obs = env.reset(v_out_command=v_out_ref, resistance_change_rate=25000)
+        obs = env.reset(v_out_command=v_out_ref, resistance_change_rate=RESISTANCE_CHANGE_RATE)
         R = 0
         step = 0
 
@@ -303,7 +306,7 @@ def main():
     agent.load(f"{SAVE_PATH}/best_model")
 
     with agent.eval_mode():
-        obs = env_for_test.reset(v_out_command=25, resistance_change_rate=25000)
+        obs = env_for_test.reset(v_out_command=25, resistance_change_rate=RESISTANCE_CHANGE_RATE)
         R = 0
         t = 0
         action_list = []

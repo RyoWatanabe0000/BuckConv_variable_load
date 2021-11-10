@@ -56,9 +56,9 @@ class BuckConverterEnv(gym.Env):
                          np.finfo(np.float32).max,
                          np.finfo(np.float32).max,
                          np.finfo(np.float32).max,
+                         np.finfo(np.float32).max,
+                         np.finfo(np.float32).max,
                          1],
-                         # np.finfo(np.float32).max,
-                         # np.finfo(np.float32).max],
                         dtype=np.float32)
         self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
 
@@ -101,15 +101,6 @@ class BuckConverterEnv(gym.Env):
                                    sp.Eq(self.iL_func_on, iL_ini)],
                                   [C1, C2], hint="best")
 
-        # print(sp.latex(self.v_out_func_off))
-        # print(sp.latex(self.iL_func_off))
-        # print(sp.latex(self.C_func_off))
-        # print("")
-        # print(sp.latex(self.v_out_func_on))
-        # print(sp.latex(self.iL_func_on))
-        # print(sp.latex(self.C_func_on))
-        # print("")
-
         self.v_out_func_off = self.v_out_func_off.subs([(L, self.L), (C, self.C), (E, self.E)])
         self.v_out_func_on = self.v_out_func_on.subs([(L, self.L), (C, self.C), (E, self.E)])
         self.iL_func_off = self.iL_func_off.subs([(L, self.L), (C, self.C), (E, self.E)])
@@ -129,15 +120,6 @@ class BuckConverterEnv(gym.Env):
         self.C1_ufunc_on = sp.lambdify((t, iL_ini, v_out_ini, R), self.C_func_on[C1], "numpy")
         self.C2_ufunc_off = sp.lambdify((t, iL_ini, v_out_ini, R), self.C_func_off[C2], "numpy")
         self.C2_ufunc_on = sp.lambdify((t, iL_ini, v_out_ini, R), self.C_func_on[C2], "numpy")
-
-        # print(sp.latex(self.v_out_func_off))
-        # print(sp.latex(self.iL_func_off))
-        # print(sp.latex(self.C_func_off))
-        # print("")
-        # print(sp.latex(self.v_out_func_on))
-        # print(sp.latex(self.iL_func_on))
-        # print(sp.latex(self.C_func_on))
-        # print("")
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -280,15 +262,13 @@ class BuckConverterEnv(gym.Env):
 
     # 3ステップの負荷電圧と現在のインダクタ電流と定常状態フラグを状態値に含む
     def __get_observation3(self):
-        observation = np.ravel(np.zeros((1, 6), dtype=np.float32))
+        observation = np.ravel(np.zeros((1, 8), dtype=np.float32))
         # 3ステップ分の負荷電流のリスト
-        iR_liston3step = [self.observation_list[self.time_index][1],
-                          self.observation_list[self.time_index + 1][1],
-                          self.observation_list[self.time_index + 2][1]]
-        observation[0: 3] = iR_liston3step
-        observation[3] = self.observation_list[self.time_index + 2][0]  # 現在のインダクタ電流を代入
-        observation[4] = self.v_out_command  # 電流の指令値を代入
-        observation[5] = self.steady_state_flag
+        observation[0: 6] = np.concatenate([self.observation_list[self.time_index],
+                                            self.observation_list[self.time_index + 1],
+                                            self.observation_list[self.time_index + 2]], 0)
+        observation[6] = self.v_out_command
+        observation[7] = self.steady_state_flag
         return observation
 
     def __get_reward(self):
@@ -402,11 +382,12 @@ class BuckConverterEnv(gym.Env):
             pre_error = 100 * abs(prepre_v_out - self.v_out_command) / self.v_out_command
             current_error = 100 * abs(prepre_v_out - self.v_out_command) / self.v_out_command
 
-            prepre_score = -0.1 * prepre_error + 0.2
-            pre_score = -0.1 * pre_error + 0.2
-            current_score = -0.1 * current_error + 0.2
+            prepre_score = -0.2 * prepre_error + 0.2
+            pre_score = -0.2 * pre_error + 0.2
+            current_score = -0.2 * current_error + 0.2
+            correction_reward = (1/3) * (prepre_score + pre_score + current_score)
 
-            reward += (1/3) * (prepre_score + pre_score + current_score)
+            reward += correction_reward
 
         else:
             reward -= 0.05
@@ -415,12 +396,12 @@ class BuckConverterEnv(gym.Env):
             if current_v_out < pre_v_out:
                 reward += 0.01
 
-        lim14 = 12 / self.normalize_ampere
+        lim135 = 13.5 / self.normalize_ampere
         lim13 = 13 / self.normalize_ampere
 
-        if current_iL > lim14:
+        if prepre_iL > lim135 or pre_iL > lim135 or current_iL > lim135:
             reward -= 5.0
-        elif current_iL > lim13:
+        elif prepre_iL > lim13 and pre_iL > lim13 and current_iL > lim13:
             reward -= 1.0
 
         return reward
