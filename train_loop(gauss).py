@@ -34,7 +34,7 @@ L = 0.50e-3
 R = 25
 C = 330e-6
 
-N_LOOP = 100
+N_LOOP = 300
 N_EPISODE = 3000
 MAX_EPI_LEN = int(TIME_LIMIT / TIME_contorl)
 GAMMA = 0.99
@@ -49,7 +49,7 @@ LEARNING_RATE = 6e-4
 SAVE_DIR = f'agents64_6e-4_gauss036_with_steadyflag_new'
 START_FLAG = True
 break_flag = False
-RESISTANCE_CHANGE_RATE = 25000
+RESISTANCE_CHANGE_RATE = 50000
 
 env = BuckConverterEnv(dt=TIME_contorl, E_ini=E, R_ini=R, L_ini=L, C_ini=C, career_amp=1, smooth_scale=1)
 env_for_test = BuckConverterEnv(dt=TIME_contorl, E_ini=E, R_ini=R, L_ini=L, C_ini=C, career_amp=1, smooth_scale=50)
@@ -240,7 +240,7 @@ def main():
     R_list = []
     for episode in range(1, N_EPISODE + 1):
 
-        v_out_ref = np.random.uniform(low=20, high=60)
+        # v_out_ref = np.random.uniform(low=20, high=60)
         v_out_ref = 25
         load_change_index = int(np.random.uniform(low=100, high=125))
         # while True:
