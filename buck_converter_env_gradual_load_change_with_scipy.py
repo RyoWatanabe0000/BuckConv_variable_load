@@ -396,7 +396,7 @@ class BuckConverterEnv(gym.Env):
             if current_v_out < pre_v_out:
                 reward += 0.01
 
-        lim135 = 13.5 / self.normalize_ampere
+        lim135 = 13.6 / self.normalize_ampere
         lim13 = 13 / self.normalize_ampere
 
         if prepre_iL > lim135 or pre_iL > lim135 or current_iL > lim135:

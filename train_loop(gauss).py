@@ -32,7 +32,7 @@ TIME_contorl = 1/FREQ_control   #制御周期
 E = 100
 L = 0.50e-3
 R = 25
-C = 220e-6
+C = 330e-6
 
 N_LOOP = 100
 N_EPISODE = 3000
@@ -45,8 +45,8 @@ REPLAY_START_SIZE = 5000
 TARGET_INTERVAL = 1000
 UPDATE_INTERVAL = 1
 MINIBATCH_SIZE = 32
-LEARNING_RATE = 3e-4
-SAVE_DIR = f'agents64_3e-4_gauss_with_steadyflag_new'
+LEARNING_RATE = 6e-4
+SAVE_DIR = f'agents64_6e-4_gauss036_with_steadyflag_new'
 START_FLAG = True
 break_flag = False
 RESISTANCE_CHANGE_RATE = 25000
@@ -189,7 +189,7 @@ def main():
         action_space=action_space,
     )
 
-    explorer = explorers.AdditiveGaussian(scale=0.4, low=env.action_space.low, high=env.action_space.high)
+    explorer = explorers.AdditiveGaussian(scale=0.36, low=env.action_space.low, high=env.action_space.high)
 
     opt = optim.Adam(q_func.parameters(), lr=LEARNING_RATE, eps=1e-8)
 
