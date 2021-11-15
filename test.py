@@ -11,10 +11,11 @@ from pfrl import nn as pnn
 from pfrl import q_functions, replay_buffers, utils
 from pfrl.agents.dqn import DQN
 
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import datetime
 from tqdm import tqdm
-from buck_converter_env import BuckConverterEnv
+# from buck_converter_env import BuckConverterEnv
+from buck_converter_env_gradual_load_change_with_scipy import BuckConverterEnv
 import matplotlib.pyplot as plt
 
 # 図用の初期設定
@@ -35,21 +36,22 @@ TIME_contorl = 1/FREQ_control   #制御周期
 
 # 素子値
 E = 100
-L = 0.35e-3
-R = 10
-C = 220e-6
+L = 0.50e-3
+R = 25
+C = 330e-6
 
 N_EPISODE = 2000
 MAX_EPI_LEN = int(TIME_LIMIT / TIME_contorl)
 GAMMA = 0.99
-N_HIDDON_CHANNEL = 64
+N_HIDDON_CHANNEL = 100
 N_HIDDON_LAYER = 2
 BUFFER_SIZE = 10**5
 REPLAY_START_SIZE = 5000
 TARGET_INTERVAL = 1000
 UPDATE_INTERVAL = 1
 MINIBATCH_SIZE = 32
-AGENT_DIR = f'agents64_3e-4_2%_withoutlog_reward_or/10171455/best_model'
+RESISTANCE_CHANGE_RATE = 50000
+AGENT_DIR = f'agents64_6e-4_gauss036_with_steadyflag_new/11150551/best_model'
 
 env = BuckConverterEnv(dt=TIME_contorl, E_ini=E, R_ini=R, L_ini=L, C_ini=C, career_amp=1, smooth_scale=50)
 
@@ -71,9 +73,7 @@ q_func = q_functions.FCQuadraticStateQFunction(
     action_space=action_space,
 )
 
-# Use the Ornstein-Uhlenbeck process for exploration
-ou_sigma = (action_space.high - action_space.low) * 0.2
-explorer = explorers.AdditiveOU(sigma=ou_sigma)
+explorer = explorers.AdditiveGaussian(scale=0.36, low=env.action_space.low, high=env.action_space.high)
 
 opt = optim.Adam(q_func.parameters())
 
@@ -99,14 +99,14 @@ agent.load(AGENT_DIR)
 
 with agent.eval_mode():
 
-    # obs = env.reset(il_ini=2.5, v_out_ini=25.006, v_out_command=25)
-    obs = env.reset(v_out_command=20)
+    obs = env.reset(v_out_command=25,
+                    resistance_change_rate=RESISTANCE_CHANGE_RATE)
     R = 0
     t = 0
     action_list = []
     while True:
-        # if t == int(MAX_EPI_LEN / 2):
-        #     env.change_load(5)
+        if t == 100:
+            env.set_load_value(5)
         action = agent.act(obs)
         obs, r, done, _ = env.step(action)
         R += r
@@ -120,7 +120,7 @@ with agent.eval_mode():
     # plt.figure()
     # plt.plot(range(1, MAX_EPI_LEN + 1), action_list)
     # env.render()
-    fig, ax1, ax2 = env.render()
+    fig, ax1, ax2 = env.render_smooth()
     # ax2.set_ylim(0, 12)
 
     # plt.xlim(1.2, 1.25)
