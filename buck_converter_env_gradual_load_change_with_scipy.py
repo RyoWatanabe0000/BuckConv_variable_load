@@ -58,7 +58,8 @@ class BuckConverterEnv(gym.Env):
                          np.finfo(np.float32).max,
                          np.finfo(np.float32).max,
                          np.finfo(np.float32).max,
-                         1],
+                         # 1],
+                         ],
                         dtype=np.float32)
         self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
 
@@ -152,7 +153,7 @@ class BuckConverterEnv(gym.Env):
         self.observation_list.append(obs)
         self.load_value_list.append(self.R_now)     # 現在の負荷の値を記録
 
-        return self.__get_observation3(), self.__get_reward3(), False, {}
+        return self.__get_observation1(), self.__get_reward3(), False, {}
 
     def reset(self, il_ini=0.0, v_out_ini=0.0, v_out_command=25, resistance_change_rate=25000):
 
@@ -178,7 +179,7 @@ class BuckConverterEnv(gym.Env):
 
         self.steady_state_flag = int(False)
 
-        return self.__get_observation3()
+        return self.__get_observation1()
 
     def render(self, mode='human'):
 
@@ -422,7 +423,7 @@ class BuckConverterEnv(gym.Env):
             # 以下負荷変動割合が自然数の場合
             self.during_load_change_flag = True
             # 負荷変動にかかる時間を計算
-            self.load_transition_time = abs(load_value - self.R_ini) / self.resistance_change_rate
+            self.load_transition_time = abs(load_value - self.R_now) / self.resistance_change_rate
             # 負荷変動に要するstep数を計算
             self.load_transition_num_step = int(np.ceil(self.load_transition_time / self.dt_cont))
             # 負荷変動が増加か減少かで傾きの符号を変える
